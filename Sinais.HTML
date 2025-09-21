@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horror Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            font-family: 'Courier New', monospace; 
+            overflow: hidden; 
+            color: #0f0;
+            padding: 20px;
+        }
+        
+        .screen {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: 600px;
+            background: #000;
+            padding: 20px;
+            overflow: hidden;
+            border: 1px solid #0f0;
+            box-shadow: 
+                inset 0 0 15px rgba(0, 255, 0, 0.3),
+                0 0 20px rgba(0, 255, 0, 0.2);
+            transition: all 0.5s;
+            animation: flicker 0.2s infinite, distort 8s infinite, shake 15s infinite, wave 10s infinite;
+        }
+        
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0%,
+                rgba(0, 255, 0, 0.05) 0.5%,
+                transparent 1%
+            );
+            pointer-events: none;
+            z-index: 1;
+            animation: scan 8s linear infinite;
+        }
+        
+        .noise {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noise)"/></svg>');
+            opacity: 0.05;
+            pointer-events: none;
+            z-index: 2;
+        }
+        
+        .game-content {
+            position: relative;
+            z-index: 3;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .menu {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            text-align: center;
+        }
+        
+        .menu-title {
+            font-size: 2.5rem;
+            margin-bottom: 50px;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: #0f0;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
+            animation: title-flicker 3s infinite;
+        }
+        
+        .menu-options {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 80%;
+        }
+        
+        .menu-option {
+            padding: 15px;
+            border: 1px solid #0f0;
+            background-color: rgba(0, 60, 0, 0.3);
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+            text-align: center;
+            text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+            color: #0f0;
+        }
+        
+        .menu-option:hover {
+            background-color: rgba(0, 255, 0, 0.2);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.7);
+            transform: translateY(-3px);
+        }
+        
+        .situation {
+            flex: 1;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            overflow-y: auto;
+            text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+            padding: 10px;
+            border: 1px solid rgba(0, 255, 0, 0.3);
+            background-color: rgba(0, 40, 0, 0.2);
+            color: #0f0;
+        }
+        
+        .options {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+        
+        @media (min-width: 768px) {
+            .options {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        
+        .option {
+            padding: 12px;
+            border: 1px solid #0f0;
+            background-color: rgba(0, 60, 0, 0.3);
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+            text-shadow: 0 0 3px rgba(0, 255, 0, 0.5);
+            color: #0f0;
+        }
+        
+        /* Classe para botões desativados durante a digitação */
+        .option.disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .option:hover:not(.disabled) {
+            background-color: rgba(0, 255, 0, 0.2);
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+        
+        .option:before {
+            content: ">";
+            margin-right: 8px;
+            color: #0f0;
+        }
+        
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            height: 1.2rem;
+            background-color: #0f0;
+            margin-left: 4px;
+            vertical-align: text-bottom;
+            animation: blink 1s infinite;
+            box-shadow: 0 0 5px rgba(0, 255, 0, 0.7);
+        }
+        
+        .footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            padding: 10px 0;
+            font-size: 12px;
+            color: #0a0;
+            border-top: 1px dashed #0f0;
+            text-shadow: 0 0 2px rgba(0, 255, 0, 0.5);
+        }
+        
+        .death-screen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            text-align: center;
+        }
+        
+        .death-title {
+            font-size: 3rem;
+            color: #ff3333;
+            text-shadow: 0 0 10px rgba(255, 51, 51, 0.8);
+            margin-bottom: 30px;
+            animation: game-over-flicker 2s infinite;
+        }
+        
+        .death-message {
+            padding: 20px;
+            border: 2px solid #ff3333;
+            background-color: rgba(40, 0, 0, 0.7);
+            text-align: center;
+            max-width: 90%;
+            position: relative;
+            overflow: hidden;
+            animation: death-glitch 1s infinite;
+            color: #ff3333;
+            text-shadow: 0 0 5px rgba(255, 51, 51, 0.5);
+        }
+        
+        .restart-button {
+            padding: 15px 30px;
+            border: 1px solid #ff3333;
+            background-color: rgba(60, 0, 0, 0.3);
+            cursor: pointer;
+            font-size: 1.2rem;
+            margin-top: 20px;
+            transition: all 0.3s;
+            color: #ff3333;
+            text-shadow: 0 0 5px rgba(255, 51, 51, 0.5);
+        }
+        
+        .restart-button:hover {
+            background-color: rgba(255, 51, 51, 0.2);
+            box-shadow: 0 0 15px rgba(255, 51, 51, 0.7);
+        }
+        
+        .red-theme {
+            border: 1px solid #ff3333 !important;
+            box-shadow: 
+                inset 0 0 15px rgba(255, 51, 51, 0.3),
+                0 0 20px rgba(255, 51, 51, 0.2) !important;
+        }
+        
+        .red-theme .scanlines {
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0%,
+                rgba(255, 51, 51, 0.05) 0.5%,
+                transparent 1%
+            ) !important;
+        }
+        
+        .red-theme .situation {
+            color: #ff3333 !important;
+            text-shadow: 0 0 5px rgba(255, 51, 51, 0.5) !important;
+            border: 1px solid rgba(255, 51, 51, 0.3) !important;
+            background-color: rgba(40, 0, 0, 0.2) !important;
+        }
+        
+        .red-theme .option {
+            color: #ff3333 !important;
+            text-shadow: 0 0 3px rgba(255, 51, 51, 0.5) !important;
+            border: 1px solid #ff3333 !important;
+            background-color: rgba(60, 0, 0, 0.3) !important;
+        }
+        
+        .red-theme .option:before {
+            color: #ff3333 !important;
+        }
+        
+        .red-theme .option:hover:not(.disabled) {
+            background-color: rgba(255, 51, 51, 0.2) !important;
+            box-shadow: 0 0 10px rgba(255, 51, 51, 0.5) !important;
+        }
+        
+        .red-theme .footer {
+            color: #cc0000 !important;
+            border-top: 1px dashed #ff3333 !important;
+            text-shadow: 0 0 2px rgba(255, 51, 51, 0.5) !important;
+        }
+        
+        .red-theme .cursor {
+            background-color: #ff3333 !important;
+            box-shadow: 0 0 5px rgba(255, 51, 51, 0.7) !important;
+        }
+        
+        /* Adicionado: Indicador de digitação em vermelho para cenas de morte */
+        .red-theme .typing-indicator {
+            color: #ff3333 !important;
+            text-shadow: 0 0 2px rgba(255, 51, 51, 0.5) !important;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .click-effect {
+            transform: scale(0.98);
+            background-color: rgba(0, 255, 0, 0.4) !important;
+        }
+        
+        .red-theme .click-effect {
+            background-color: rgba(255, 51, 51, 0.4) !important;
+        }
+        
+        .typing-indicator {
+            position: absolute;
+            bottom: 50px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 0.9rem;
+            color: #0a0;
+            opacity: 0.7;
+        }
+        
+        @keyframes scan {
+            0% { background-position: 0 0; }
+            100% { background-position: 0 100%; }
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            25% { opacity: 0.85; }
+            50% { opacity: 0.95; }
+            75% { opacity: 0.9; }
+        }
+        
+        @keyframes distort {
+            0%, 100% { transform: scale(1, 1); }
+            50% { transform: scale(1.01, 0.99); }
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0); }
+            10%, 30%, 50%, 70%, 90% { transform: translate(-5px, -5px); }
+            20%, 40%, 60%, 80% { transform: translate(5px, 5px); }
+        }
+        
+        @keyframes death-shake {
+            0%, 100% { transform: translate(0, 0); }
+            10%, 30%, 50%, 70%, 90% { transform: translate(-10px, -10px); }
+            20%, 40%, 60%, 80% { transform: translate(10px, 10px); }
+        }
+        
+        @keyframes wave {
+            0%, 100% { transform: skewX(0deg); }
+            50% { transform: skewX(0.5deg); }
+        }
+        
+        @keyframes title-flicker {
+            0%, 100% { text-shadow: 0 0 10px rgba(0, 255, 0, 0.8); }
+            50% { text-shadow: 0 0 15px rgba(0, 255, 0, 1), 0 0 25px rgba(0, 255, 0, 0.8); }
+        }
+        
+        @keyframes game-over-flicker {
+            0%, 100% { opacity: 1; text-shadow: 0 0 10px rgba(255, 51, 51, 0.8); }
+            50% { opacity: 0.7; text-shadow: 0 0 20px rgba(255, 51, 51, 1); }
+        }
+        
+        @keyframes death-glitch {
+            0%, 100% { transform: translate(0, 0); opacity: 1; }
+            10% { transform: translate(-2px, -2px); }
+            20% { transform: translate(2px, 2px); }
+            30% { transform: translate(-1px, 1px); }
+            40% { transform: translate(1px, -1px); }
+            50% { transform: translate(0, 0); opacity: 0.8; }
+            60% { transform: translate(3px, 0); }
+            70% { transform: translate(-3px, 0); }
+            80% { transform: translate(0, 3px); }
+            90% { transform: translate(0, -3px); }
+        }
+    </style>
+</head>
+<body>
+    <div class="screen">
+        <div class="scanlines"></div>
+        <div class="noise"></div>
+        
+        <div class="game-content">
+            <div id="main-menu" class="menu">
+                <div class="menu-title">HORROR GAME 80s</div>
+                <div class="menu-options">
+                    <div class="menu-option" id="play-option">JOGAR</div>
+                </div>
+                <div class="footer">
+                    <div>Sistema Operacional DOS 3.1 // Memória: 640K</div>
+                </div>
+            </div>
+            
+            <div id="choice-scene" class="hidden">
+                <div id="situation" class="situation"></div>
+                <div id="options" class="options"></div>
+                <div class="typing-indicator hidden" id="typing-indicator">Digitando...</div>
+                <div class="footer">
+                    <div>Sistema Operacional DOS 3.1 // Memória: 640K</div>
+                </div>
+            </div>
+            
+            <div id="death-screen" class="death-screen hidden">
+                <div class="death-title">GAME OVER</div>
+                <div id="death-message" class="death-message"></div>
+                <div class="restart-button" id="restart-button">REINICIAR</div>
+                <div class="footer">
+                    <div>Sistema Operacional DOS 3.1 // Memória: 640K</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Elementos DOM
+        const mainMenu = document.getElementById('main-menu');
+        const choiceScene = document.getElementById('choice-scene');
+        const deathScreen = document.getElementById('death-screen');
+        const situationElement = document.getElementById('situation');
+        const optionsElement = document.getElementById('options');
+        const playOption = document.getElementById('play-option');
+        const restartButton = document.getElementById('restart-button');
+        const deathMessage = document.getElementById('death-message');
+        const screenElement = document.querySelector('.screen');
+        const typingIndicator = document.getElementById('typing-indicator');
+        
+        // Variável para controlar se a digitação está em andamento
+        let isTyping = false;
+        // Variável para controlar se é uma cena de morte
+        let isDeathScene = false;
+
+        // Estado do jogo
+        const game = {
+            corda: false, // Inicialmente não tem a corda
+            chaveportao: false,
+            radio: false
+        };
+
+        let gameState = {
+            currentScene: 'scene1'
+        };
+        
+        // Todas as cenas do jogo
+         const scenes = {
+            scene1: {
+                description: "Você acorda depois de ouvir um barulho forte, como se um móvel ou objeto pesado tivesse caído no andar debaixo. O quarto está escuro e quieto, mas o som de um rádio ligado em um canal sem sinal vem de baixo, chiando sem parar. A porta do seu quarto está fechada.",
+                options: [
+                    { text: "Sair do Seu Quarto", nextScene: "sceneSA1" },
+                    { text: "Olhar o Quarto", nextScene: "sceneQ2" },
+                    { text: "Voltar a Dormir", nextScene: "sceneQ3" }
+                ]
+            },
+            
+            sceneQ2: {
+                description: "Você observa o quarto com mais atenção. Há roupas amontoadas na cadeira perto da escrivaninha. A mochila está aberta no chão, com alguns livros caídos para fora. Os seus troféus do campeonato passado estão alinhados na prateleira, criando silhuetas escuras no meio da pouca luz. Nada parece fora do lugar, mas o barulho lá embaixo não combina com o silêncio aqui.",
+                options: [
+                    { text: "Olhar a Escrivaninha", nextScene: "sceneQ2Op1" },
+                    { text: "Olhar Seus Troféus", nextScene: "sceneQ2Op2" },
+                    { text: "Olhar Dentro da Mochila", nextScene: "sceneQ2Op3" },
+                    { text: "Sair do Seu Quarto", nextScene: "sceneSA1" }
+                ]
+            },
+
+            sceneQ2V1: {
+                description: "Você volta para o seu quarto, entrando com cautela. O som do rádio continua insistente vindo do andar debaixo. O quarto permanece do mesmo jeito de sempre, nada parece diferente.",
+                options: [
+                    { text: "Sair do Seu Quarto", nextScene: "sceneSA1" },
+                    { text: "Olhar o Quarto", nextScene: "sceneQ2" },
+                    { text: "Voltar a Dormir", nextScene: "sceneQ3" }
+                ]
+            },
+            
+            sceneQ2Op1: {
+                description: "Você se aproxima da escrivaninha e vê o seu diário aberto em cima dela. Algumas páginas estão rabiscadas com frases confusas. Há coisas que você escreveu ali que preferia esquecer, detalhes de coisas horríveis que fez. Você tenta não olhar muito, mas é impossível não lembrar que ela não tinha culpa, você tinha. Nada mais chama atenção aqui.",
+                options: [
+                    { text: "Voltar", nextScene: "sceneQ2" },
+                ]
+            },
+            
+            sceneQ2Op2: {
+                description: "Você olha para os troféus alinhados na prateleira. São do campeonato do ano passado, que aconteceu na cidade vizinha. Todos têm placas com seu nome gravado, ainda brilham um pouco na pouca luz do quarto. Eles projetam sombras retorcidas na parede, mas não há mais nada ali.",
+                options: [
+                    { text: "Voltar", nextScene: "sceneQ2" },
+                ]
+            },
+            
+            sceneQ2Op3: {
+                description: "Você se agacha e abre a mochila jogada no chão. Dentro, há alguns livros amassados, cadernos rabiscados e uma lanterna velha sem pilhas. Um pacote de biscoitos aberto derramou migalhas no fundo. Nada parece fora do lugar, mas o chiado vindo do andar debaixo continua.",
+                options: [
+                    { text: "Voltar", nextScene: "sceneQ2" },
+                ]
+            },
+            
+            sceneQ3: {
+                description: "Você se deita de lado, ajeita o travesseiro e tenta fechar os olhos, mas o barulho do rádio ligado no andar debaixo continua igual, intercalado por rangidos fracos no piso. Você fica na mesma posição por alguns minutos, mas não consegue pegar no soma. O quarto permanece escuro e o chiado não para.",
+                options: [
+                    { text: "Sair do Seu Quarto", nextScene: "sceneSA1" },
+                    { text: "Olhar o Quarto", nextScene: "sceneQ2" },
+                    { text: "Cobrir a Cabeça com o Lençol", nextScene: "deathQ3Op1" },
+                ]
+            },
+            
+            deathQ3Op1: {
+                description: "Você puxa o lençol até cobrir a cabeça inteira. O chiado do rádio no andar debaixo continua sem parar, misturado a rangidos no piso. O ar fica quente debaixo do tecido, mas você não se mexe. Depois de alguns segundos, ouve passos entrando no quarto. Você tenta tirar o lençol, mas é tarde. O chiado aumenta até estourar seus ouvidos e uma faca fria dilacera o seu rosto.",
+                options: [
+                    { text: "REINICIAR", nextScene: "reload" }
+                ]
+            },
+            
+            sceneSA1: {
+                description: "Você gira a maçaneta devagar para não fazer barulho e abre a porta. O corredor está escuro e o piso de madeira range quando você pisa. O chiado do rádio vindo do andar debaixo fica mais alto agora que a porta está aberta. Dá para ouvir um barulho fraco de algo raspando pelo chão. À sua frente, o corredor segue até a outra ponta da casa. À esquerda fica a escada para o andar debaixo. Há um interruptor de luz na parede, logo ao lado da porta.",
+                options: [
+                    { text: "Descer as Escadas", nextScene: "scenePA1" },
+                    { text: "Continuar pelo Corredor", nextScene: "sceneSA2" },
+                    { text: "Acender a Luz do Corredor", nextScene: "deathSA1Op1" },
+                    { text: "Voltar para Seu Quarto", nextScene: "sceneQ2V1" },
+                ]
+            },
+
+            sceneSA1V1: {
+                description: "Você volta para o início do corredor, ficando de frente com a porta do seu quarto. À sua frente, o corredor segue até a outra ponta da casa. À esquerda fica a escada para o andar debaixo. Há um interruptor de luz na parede, logo ao lado da porta.",
+                options: [
+                    { text: "Descer as Escadas", nextScene: "scenePA1" },
+                    { text: "Continuar pelo Corredor", nextScene: "sceneSA2" },
+                    { text: "Acender a Luz do Corredor", nextScene: "deathSA1Op1" },
+                    { text: "Voltar para Seu Quarto", nextScene: "sceneQ2V1" },
+                ]
+            },
+            
+            deathSA1Op1: {
+                description: "Quando você acende a luz, o que quer que esteja lá embaixo percebe sua presença. O chiado do rádio aumenta de repente até o som ficar alto o bastante para estourar seus tímpanos. Você não consegue reagir antes de sentir uma lâmina fria cortar seu pescoço. Seu corpo cai no chão sem força.",
+                options: [
+                    { text: "REINICIAR", nextScene: "reload" }
+                ]
+            },
+            
+            sceneSA2: {
+                description: "Você segue pelo corredor à frente. No meio do caminho, vê duas portas: uma leva ao banheiro, a outra é o quarto dos seus pais. Está bem escuro, mas você ainda consegue enxergar alguma coisa por causa da janela no fim do corredor, onde a luz da lua entra e ilumina parte do chão e das paredes.",
+                options: [
+                    { text: "Entrar no Banheiro", nextScene: "sceneSA3" },
+                    { text: "Entrar no Quarto dos Pais", nextScene: "sceneSA5" },
+                    { text: "Ir até a Janela", nextScene: "sceneSA4" },
+                    { text: "Voltar para o Início do Corredor", nextScene: "sceneSA1V1" },
+                ]
+            },
+
+            sceneSA2V1: {
+                description: "Você volta para o corredor, ficando de frente novamente com o mesmo ambiente. Duas portas ficam no caminho: uma leva ao banheiro, outra ao quarto dos seus pais. A janela no fim do corredor deixa passar a luz da lua, iluminando parte do chão e das paredes.",
+                options: [
+                    { text: "Entrar no Banheiro", nextScene: "sceneSA3" },
+                    { text: "Entrar no Quarto dos Pais", nextScene: "sceneSA5" },
+                    { text: "Ir até a Janela", nextScene: "sceneSA4" },
+                    { text: "Voltar para o Início do Corredor", nextScene: "sceneSA1V1" },
+                ]
+            },
+
+            sceneSA3: {
+                description: "Você entra no banheiro com passos curtos. O cheiro de sabonete velho e umidade fica mais forte. As toalhas penduradas ainda estão úmidas, o tapete está torto, como se alguém tivesse saído apressado. O espelho sobre a pia está embaçado em alguns pontos, mas ainda mostra seu rosto parado na pouca luz que vem do corredor. O armário de remédios fica logo acima da pia, com a porta entreaberta. O box do chuveiro está fechado, com gotas de água escorrendo pelo vidro",
+                options: [
+                    { text: "Limpar o Espelho", nextScene: "sceneSA3Op1" },
+                    { text: "Ver Dentro do Armário", nextScene: "sceneSA3Op2" },
+                    { text: "Abrir o Box do Chuveiro", nextScene: "sceneSA3Op3" },
+                    { text: "Voltar para o Corredor", nextScene: "sceneSA2V1" },
+                ]
+            },
+
+            sceneSA3Op1: {
+                description: "Você passa a mão no espelho, tentando limpar o embaçado. A marca dos seus dedos fica no vidro, mas o reflexo continua estranho, como se a luz fosse falha demais. Seu rosto parece mais pálido do que antes, e por um segundo parece que algo se mexe atrás de você, mas não há nada.",
+                options: [
+                    { text: "Voltar", nextScene: "sceneSA3" },
+                ]
+            },
+
+            sceneSA3Op2: {
+                description: "Você abre a porta do armário de remédios devagar. Lá dentro tem algumas cartelas de comprimidos pela metade, frascos de remédio mal tampados e um pote de algodão. Um vidro pequeno está quebrado, pingando um líquido escuro no fundo do armário.",
+                options: [
+                    { text: "Voltar", nextScene: "sceneSA3" },
+                ]
+            },
+
+            sceneSA3Op3: {
+                description: "Você abre a porta de vidro fosco do box. O chão dentro ainda está molhado, com marcas de pegadas indo para o ralo. Não há mais ninguém ali, mas a água pingando do chuveiro continua fazendo barulho, misturada com o chiado do rádio que não para.",
+                options: [
+                    { text: "Olhar o Ralo", nextScene: "deathSA3Op3" },
+                    { text: "Voltar", nextScene: "sceneSA3" },
+                ]
+            },
+
+            deathSA3Op3: {
+                description: "Você se abaixa para olhar o ralo dentro do box. A água suja desce devagar, girando em círculos. Um som oco ecoa lá de dentro, como se algo raspasse os canos. Antes que consiga se afastar, uma mão fina e pálida sai do ralo, agarra sua cabeça e puxa para baixo. Você tenta se soltar, mas seu rosto não passa pelo buraco. A mão força mais, batendo sua cabeça nas bordas de metal, uma, duas, três vezes, até que seus ossos começam a rachar. Quando seu crânio está deformado o bastante para caber, sua visão já se apaga.",
+                options: [
+                    { text: "REINICIAR", nextScene: "reload" }
+                ]
+            },
+
+            sceneSA4: {
+                description: "Você vai até a janela no fim do corredor e olha para fora. Está nevando como sempre, e tudo parece muito escuro. A rua está vazia, iluminada só por um poste de luz que pisca de vez em quando. Desse ponto da casa, o chiado do rádio parece mais baixo. A janela está destrancada.",
+                options: [
+                    { text: "Sair pela Janela", nextScene: "deathSA4op1" },
+                    { text: "Voltar para o Corredor", nextScene: "sceneSA2V1" },
+                    { 
+                        text: "Usar a Corda", 
+                        nextScene: "sceneSA4Op2",
+                        condition: () => game.corda // Só aparece se tiver a corda
+                    }
+                ]
+            },
+
+            sceneSA4Op2: {
+                description: "Você prende a corda na base do corrimão perto da janela e confere se está firme. O vento frio entra sem parar, trazendo a neve contra o rosto. Segura a corda com força, passa pelas bordas geladas da janela e começa a descer devagar pela lateral da casa. A corda escorrega um pouco por causa da neve acumulada, mas seus pés alcançam o quintal sem acidente. O chão está coberto de neve grossa e o chiado do rádio ainda pode ser ouvido fraco vindo de dentro da casa.",
+                options: [
+                    { text: "Continuar para o Quintal", nextScene: "sceneSA4LF" }
+                ]
+            },
+
+            sceneSA4LF: {
+                description: "Você fica em pé no quintal, sentindo o vento cortar por cima da neve. As muretas que cercam o quintal são cobertas por grama alta, agora enterrada sob uma camada grossa de gelo branco. No canto esquerdo, a cerca está torta, criando uma brecha por onde alguém poderia passar. Do outro lado, o portão principal de ferro está fechado, mas o cadeado parece velho e enferrujado. Atrás de você fica a porta dos fundos da casa, entreaberta, de onde ainda escapa o chiado insistente do rádio.",
+                options: [
+                    { text: "Ir até a Brecha na Mureta", nextScene: "sceneLF1" },
+                    { text: "Ir até o Portão Principal", nextScene: "sceneLF2" },
+                    { text: "Voltar pela Porta dos Fundos", nextScene: "deathSA4LF" }
+                ]
+            },
+
+            sceneSA4LFV1: {
+                description: "Você volta para o centro do quintal, sentindo o vento cortar por cima da neve. As muretas que cercam o quintal são cobertas por grama alta, agora enterrada sob uma camada grossa de gelo branco. No canto esquerdo, a cerca está torta, criando uma brecha por onde alguém poderia passar. Do outro lado, o portão principal de ferro está fechado, mas o cadeado parece velho e enferrujado. Atrás de você fica a porta dos fundos da casa, entreaberta, de onde ainda escapa o chiado insistente do rádio.",
+                options: [
+                    { text: "Ir até a Brecha na Mureta", nextScene: "sceneLF1" },
+                    { text: "Ir até o Portão Principal", nextScene: "sceneLF2" },
+                    { text: "Voltar pela Porta dos Fundos", nextScene: "deathSA4LF" }
+                ]
+            },
+
+            deathSA4LF: {
+                description: "O vento empurra a porta dos fundos, que range, meio aberta. Assim que cruza o batente, sente um baque seco atrás da cabeça — pesado, direto, como se alguém tivesse batido com um martelo. Você cai de joelhos, tonto, vendo só borrões. Antes de entender o que aconteceu, mãos enormes seguram sua nuca, pressionando seu rosto contra o chão gelado da cozinha. O chiado do rádio engole qualquer tentativa de grito. A lâmina de um cutelo surge no canto da sua visão, refletindo a luz trêmula da lâmpada. A primeira pancada corta sua orelha, a segunda atravessa metade do crânio. Você ainda tenta engasgar um gemido quando sente os ossos rachando. A mão do assassino torce sua cabeça até ouvir um estalo surdo. O chiado do rádio continua, enquanto seu sangue escorre pela porta entreaberta e congela na neve.",
+                options: [
+                    { text: "REINICIAR", nextScene: "reload" }
+                ]
+            },
+
+            sceneLF1: {
+                description: "Você caminha devagar pela neve fofa até o canto onde a mureta está mais baixa. A grama alta, agora dura e congelada, raspa na sua perna quando você se aproxima. A brecha na mureta é larga o bastante para passar agachado, mas do outro lado só dá pra ver um terreno baldio coberto de mato seco e manchas de neve suja. Um galho quebrado balança com o vento, rangendo baixo.",
+                options: [
+                    { text: "Tentar Passar pela Brecha na Mureta", nextScene: "deathLF1Op1" },
+                    { text: "Voltar", nextScene: "sceneSA4LFV1" }
+                ]
+            },
+
+            deathLF1Op1: {
+                description: "Você se agacha e começa a passar pela brecha, empurrando a grama congelada com os braços. Quando está quase do outro lado, algo prende sua perna com força. Você olha para trás e vê uma mão pálida saindo debaixo da neve, segurando seu tornozelo. Antes que consiga reagir, é puxado de volta com tanta força que sua cabeça bate na quina da mureta. Você sente o crânio se partir antes de tudo ficar escuro.",
+                options: [
+                    { text: "REINICIAR", nextScene: "reload" }
+                ]
+            },
+
+            sceneLF2: {
+                description: "Você anda pela neve até o portão de ferro, sentindo o rangido baixo dos seus passos. O portão está coberto por uma camada fina de gelo, e o cadeado preso na corrente parece antigo, com ferrugem escorrendo pelas dobradiças. Quando você encosta nele, o metal está tão frio que queima seus dedos por um segundo. Do outro lado, a rua está deserta, com a neve se acumulando no asfalto sem marcas de pegadas ou pneus.",
+                options: [
+                    { text: "Tentar Abrir o Portão Principal", nextScene: "sceneLF2Op1" },
+                    { 
+                        text: "Destrancar o Portão com a Chave", 
+                        nextScene: "sceneSaida",
+                        condition: () => game.chaveportao // Só aparece se tiver a chave
+                    },
+                    { text: "Voltar", nextScene: "sceneSA4LFV1" }
+                ]
+            },
+
+            sceneSaida: {
+                description: "Você pisa na neve fofa, sentindo o frio morder seus dedos. A chave do portão se encaixa com facilidade na fechadura velha. O trinco faz um estalo seco quando você gira a chave, destrancando o portão principal. Do outro lado, só dá pra ver a rua coberta de neve, quase toda apagada pela nevasca.",
+                options: [
+                    { text: "Ir Embora", nextScene: "sceneFinal1N" }
+                ]
+            },
+
+            sceneFinal1N: {
+                description: "Você empurra o portão destrancado, sentindo o vento congelante bater no seu rosto. A neve cobre tudo ao redor, engolindo seus passos enquanto você atravessa a rua deserta. O chiado do rádio some atrás de você, ficando cada vez mais distante. Você não olha para trás. Só continua andando, deixando aquela casa para trás.",
+                options: [
+                    { text: "Fim.", nextScene: "sceneEnigmaN" }
+                ]
+            },
+
+            sceneEnigmaN: {
+                description: "É o N na sexta posição.",
+                options: [
+                    { text: "REINICIAR", nextScene: "reload" }
+                ]
+            },
+
+            sceneLF2Op1: {
+                description: "Você puxa o cadeado algumas vezes, mas ele não se mexe. A corrente está firme e enferrujada, impossível de quebrar com as mãos. Sem a chave certa, não há como abrir o portão agora.",
+                options: [
+                    { text: "Voltar", nextScene: "sceneLF2" }
+                ]
+            },
+
+            deathSA4op1: {
+                description: "Você destranca a janela e a empurra para abrir. O vento gelado entra forte, carregando flocos de neve que grudam no seu rosto. Você tenta se apoiar na borda, mas o chão coberto de gelo lá fora faz você perder o equilíbrio. Antes que consiga segurar em algo, seu corpo escorrega e você despenca do andar de cima. A queda é rápida, a neve amortece pouco o impacto. Você sente um estalo seco na sua perna e o chiado do rádio ainda soa longe, mas você não consegue se mover. Seus olhos fecham enquanto a neve cobre tudo.",
+                options: [
+                    { text: "REINICIAR", nextScene: "reload" }
+                ]
+            },
+            
+            sceneSA5: {
+                description: "Você empurra a porta devagar e entra no quarto dos seus pais. O ar é frio e parado. A cama está desfeita, com os cobertores embolados no chão. O criado-mudo ao lado da cama tem uma luminária apagada e alguns objetos espalhados, como se alguém tivesse revirado tudo. O armário está entreaberto, com uma parte da roupa pendurada para fora. A janela no canto deixa passar a luz fraca da lua, iluminando o carpete manchado. Seus pais saíram mais cedo para visitar sua avó no hospital, então o quarto deveria estar vazio.",
+                options: [
+                    { text: "Olhar Debaixo da Cama", nextScene: "sceneSA5Op1" },
+                    { text: "Abrir o Armário por Completo", nextScene: "sceneSA5Op2" },
+                    { text: "Vasculhar o Criado-Mudo", nextScene: "sceneSA5Op3" },
+                    { text: "Voltar para o Corredor", nextScene: "sceneSA2V1" },
+                ]
+            },
+
+            sceneSA5Op1: {
+                description: "Você se abaixa devagar e levanta a colcha para olhar debaixo da cama. Por um instante, só enxerga a poeira acumulada e um par de chinelos velhos. Então vê algo se mexendo na escuridão, rápido demais para entender. Antes que consiga se levantar, mãos frias agarram seu pescoço e te puxam com força para baixo. Sua cabeça bate na madeira da cama, o ar sai dos pulmões, e a pressão aumenta até você sentir os ossos do pescoço cederem. A escuridão fica total.",
+                options: [
+                    { text: "REINICIAR", nextScene: "reload" }
+                ]
+            },
+
+            sceneSA5Op2: {
+                description: "Você segura a porta do armário e a abre até ouvir o rangido das dobradiças. A luz fraca revela roupas penduradas de qualquer jeito, caixas de sapato empilhadas e uma mala semiaberta. No fundo, vê um espaço mais escuro onde uma corda grossa está enrolada em cima de uma pilha de casacos. A corda parece usada, com marcas de nó mal desatado.",
+                options: [
+                    { text: "Voltar", nextScene: "sceneSA5" },
+                    { 
+                        text: "Pegar a Corda", 
+                        nextScene: "sceneKey1",
+                        action: () => game.corda = true // Ao escolher, define game.corda como true
+                    },
+                ]
+            },
+
+            sceneKey1: {
+                description: "Você se abaixa dentro do armário e puxa a corda enrolada em cima dos casacos. Ela está úmida em alguns pontos, como se tivesse sido guardada sem secar direito. Dá pra ver marcas de nó apertado, algumas partes mais gastas e fiapos soltos na ponta. O cheiro de mofo é forte.",
+                options: [
+                    { text: "Voltar", nextScene: "sceneSA5" }
+                ]
+            },
+
+            sceneSA5Op3: {
+                description: "Você abre a gaveta do criado-mudo. Lá dentro encontra papéis rasgados, contas antigas, uma foto da sua família na praia e um chaveiro pequeno com uma chave que não reconhece. Alguns remédios espalhados rolam para o chão quando você mexe.",
+                options: [
+                    { text: "Voltar", nextScene: "sceneSA5" },
+                ]
+            },
+
+            scenePA1: {
+                description: "Você pisa devagar degrau por degrau, sentindo a madeira ranger sob seus pés. O chiado do rádio fica mais alto a cada passo. Quando chega ao térreo, percebe que o som vem da cozinha, logo à esquerda do corredor. À direita, a sala de estar está na penumbra, com a luz da rua entrando pelas janelas fechadas. Em frente, a porta de entrada da casa permanece trancada. Fora do seu campo de visão, mas perceptível pelo vento gelado que invade o corredor, a porta dos fundos provavelmente está aberta.",
+                options: [
+                    { text: "Ir para a Cozinha", nextScene: "scenePA2" },
+                    { text: "Ir para a Sala de Estar", nextScene: "scenePA3" },
+                    { text: "Ir para a Porta de Entrada", nextScene: "scenePA4" },
+                    { text: "Ir para a Porta dos Fundos", nextScene: "deathPA1Op1" },
+                    { text: "Voltar para o Segundo Andar", nextScene: "sceneSA2V2" },
+                ]
+            },
+
+            scenePA1V1: {
+                description: "Você volta para a frente da escada que leva ao segundo andar. A cozinha, de onde vem o som do rádio, fica logo à esquerda do corredor. À direita, a sala de estar está na penumbra, com a luz da rua entrando pelas janelas fechadas. Em frente, a porta de entrada da casa permanece trancada. Fora do seu campo de visão, mas perceptível pelo vento gelado que invade o corredor, a porta dos fundos provavelmente está aberta.",
+                options: [
+                    { text: "Ir para a Cozinha", nextScene: "scenePA2" },
+                    { text: "Ir para a Sala de Estar", nextScene: "scenePA3" },
+                    { text: "Ir para a Porta de Entrada", nextScene: "scenePA4" },
+                    { text: "Ir para a Porta dos Fundos", nextScene: "deathPA1Op1" },
+                    { text: "Voltar para o Segundo Andar", nextScene: "sceneSA2V2" },
+                ]
+            },
+
+            sceneSA2V2: {
+                description: "Você sobe de volta para o segundo andar, ficando de frente para a porta do seu quarto. À sua frente, o corredor se estende até a outra ponta da casa. À esquerda, a escada leva ao andar debaixo. Na parede, ao lado da porta, há um interruptor de luz.",
+                options: [
+                    { text: "Descer as Escadas", nextScene: "scenePA1" },
+                    { text: "Continuar pelo Corredor", nextScene: "sceneSA2" },
+                    { text: "Acender a Luz do Corredor", nextScene: "deathSA1Op1" },
+                    { text: "Voltar para Seu Quarto", nextScene: "sceneQ2V1" },
+                ]
+            },
+
+            deathPA1Op1: {
+                description: "Você caminha até a porta dos fundos, sentindo o vento gelado ficar mais forte a cada passo. A penumbra no corredor parece engolir o pouco de luz que vem de fora. Quando estica a mão para empurrar a porta aberta de vez, algo atrás de você se move rápido. Você sente um aperto forte no pescoço, dedos frios esmagando sua garganta. Antes que consiga virar o rosto, sua cabeça é puxada para trás e esmagada contra a parede ao lado da porta dos fundos. O som do rádio aumenta, cobrindo seus últimos suspiros.",
+                options: [
+                    { text: "REINICIAR", nextScene: "reload" }
+                ]
+            },
+
+            deathPA1Op2: {
+                description: "Você começa a subir as escadas, mas de repente sente uma pressão forte no seu pé — uma armadilha de urso fechou com força, prendendo sua perna. Você escuta passos pesados vindo rápido na sua direção. Desesperado, tenta se soltar e, em meio ao desespero, arranca o próprio pé para escapar. Mal consegue se equilibrar quando a coisa se aproxima. Ela pisa na sua cabeça várias vezes, esmagando o crânio até que tudo fique escuro.",
+                options: [
+                    { text: "REINICIAR", nextScene: "reload" }
+                ]
+            },
+
+            scenePA2: {
+                description: "Você segue pelo corredor até a cozinha. O chiado do rádio fica mais forte quando cruza a porta. A luz fraca da lâmpada pendurada no teto ilumina uma pia cheia de pratos empilhados, a mesa com duas cadeiras puxadas para trás e o chão com algumas migalhas espalhadas. O rádio velho está em cima do balcão, ligado no volume máximo, mas não passa de estática. Fora isso, tudo parece normal, não há sinal de nada fora do lugar.",
+                options: [
+                    { 
+                        text: "Tentar Desligar o Rádio", 
+                        nextScene: "sceneKey2",
+                        action: () => game.radio = true // Ao escolher, define game.corda como true
+                    },
+                    { text: "Olhar a Pia", nextScene: "scenePA1Op1" },
+                    { text: "Voltar para o Corredor", nextScene: "scenePA1V1" },
+                ]
+            },
+
+            scenePA1Op1: {
+                description: "A pia está cheia de pratos sujos. Era sua responsabilidade lavar, mas isso é coisa para sua mãe fazer, você pensa em voz baixa.",
+                options: [
+                    { text: "Voltar", nextScene: "scenePA2" }
+                ]
+            },
+
+            sceneKey2: {
+                description: "Você aperta o botão para desligar o rádio, mas ele não responde. Parece que o botão está emperrado ou travado. O chiado continua alto, insistente, sem nenhuma mudança. Não há jeito de calar aquele som irritante.",
+                options: [
+                    { text: "Voltar", nextScene: "scenePA2V1" }
+                ]
+            },
+
+            scenePA2V1: {
+                description: "Você segue pelo corredor até a cozinha. O chiado do rádio fica mais forte quando cruza a porta. A luz fraca da lâmpada pendurada no teto ilumina uma pia cheia de pratos empilhados, a mesa com duas cadeiras puxadas para trás e o chão com algumas migalhas espalhadas. O rádio velho está em cima do balcão, ligado no volume máximo, mas não passa de estática. Fora isso, tudo parece normal, não há sinal de nada fora do lugar.",
+                options: [
+                    { 
+                        text: "Tentar Desligar o Rádio", 
+                        nextScene: "sceneKey2",
+                        // Na ação do rádio
+                        action: () => {
+                            if (!game.radio) game.radio = true; // Só marca uma vez
+                        }
+                    },
+                    { text: "Olhar a Pia", nextScene: "scenePA1V1Op1" },
+                    { text: "Voltar para o Corredor", nextScene: "scenePA1V2" },
+                ]
+            },
+
+            scenePA1V1Op1: {
+                description: "A pia está cheia de pratos sujos. Era sua responsabilidade lavar, mas isso é coisa para sua mãe fazer, você pensa em voz baixa.",
+                options: [
+                    { text: "Voltar", nextScene: "scenePA2V1" }
+                ]
+            },
+
+            scenePA1V2: {
+                description: "Você volta para a frente da escada que leva ao segundo andar. A cozinha, de onde vem o som do rádio, fica logo à esquerda do corredor. À direita, a sala de estar está na penumbra, com a luz da rua entrando pelas janelas fechadas. Em frente, a porta de entrada da casa permanece trancada. Fora do seu campo de visão, mas perceptível pelo vento gelado que invade o corredor, a porta dos fundos provavelmente está aberta.",
+                options: [
+                    { text: "Ir para a Cozinha", nextScene: "scenePA2" },
+                    { text: "Ir para a Sala de Estar", nextScene: "scenePA3" },
+                    { text: "Ir para a Porta de Entrada", nextScene: "scenePA4" },
+                    { text: "Ir para a Porta dos Fundos", nextScene: "deathPA1Op1" },
+                    { 
+                        text: "Voltar para o Segundo Andar", 
+                        nextScene: "deathPA1Op2",
+                        condition: () => game.radio // Só aparece se tiver a corda
+                    }
+                ]
+            },
+
+            scenePA3: {
+                description: "Você entra na sala de estar. A penumbra domina o ambiente, mas a luz da rua entra pelas frestas das cortinas fechadas. Um sofá grande fica encostado na parede, com algumas almofadas caídas no chão. Em frente ao sofá, uma velha televisão está apoiada em um rack, coberta de poeira. Ao lado, uma estante com livros desorganizados ocupa quase toda a parede.",
+                options: [
+                    { text: "Olhar o Sofá", nextScene: "scenePA3Op1" },
+                    { text: "Olhar a Televisão", nextScene: "scenePA3Op2" },
+                    { text: "Vasculhar a Estante de Livros", nextScene: "scenePA3Op3" },
+                    { text: "Voltar para o Corredor", nextScene: "scenePA1V1" },
+                ]
+            },
+
+            scenePA4: {
+                description: "Você para em frente à porta de entrada trancada. A chave ainda está encaixada na fechadura, junto da chave do portão da frente pendurada no mesmo chaveiro. Pela fresta da porta, dá pra ver que está nevando forte lá fora. O vento gelado entra pelas frestas, misturado com o chiado distante do rádio.",
+                options: [
+                    { text: "Destrancar a Porta de Entrada", nextScene: "deathPA4" },
+                    { 
+                        text: "Pegar o Chaveiro da Fechadura", 
+                        nextScene: "sceneKey3",
+                        action: () => game.chaveportao = true // Ao escolher, define game.corda como true
+                    },
+                    { text: "Voltar para o Corredor", nextScene: "scenePA1V1" },
+                ]
+            },
+
+            sceneKey3: {
+                description: "Você segura o chaveiro que está encaixado na fechadura da porta de entrada. As chaves estão frias ao toque, o metal gelado arrepia seus dedos. Dá pra ver que uma delas serve para o portão principal lá fora. Você enfia o chaveiro no bolso, sentindo o peso dele enquanto o chiado do rádio continua ao fundo.",
+                options: [
+                    { text: "Voltar", nextScene: "scenePA1V1" },
+                ]
+            },
+
+           deathPA4: {
+                description: "Você usa a chave, tentando fazer o mínimo de barulho possível. Quando a porta destranca, uma lufada de vento gelado entra, carregando flocos de neve. Antes que consiga abrir de vez, sente um baque pesado nas costas. Algo te empurra com força contra a porta semiaberta. Um som molhado ecoa perto do seu ouvido. Você olha para o vidro da porta: uma lâmina crava no reflexo da sua garganta. O rádio chia tão alto que parece rir de você enquanto o sangue escorre pela tranca recém-aberta. Você cai de joelhos e o último rangido que ouve é a porta batendo de novo, fechando tudo lá dentro junto com seu corpo.",
+                options: [
+                    { text: "REINICIAR", nextScene: "reload" }
+                ]
+            },
+
+            scenePA3Op1: {
+                description: "Você observa o sofá. O tecido está gasto em alguns pontos e há manchas antigas que nunca saíram. As almofadas estão jogadas de qualquer jeito, como se alguém tivesse saído com pressa. Não parece ter nada escondido.",
+                options: [
+                    { text: "Voltar", nextScene: "scenePA3" },
+                ]
+            },
+
+            scenePA3Op3: {
+                description: "Você examina a estante de livros encostada na parede. Alguns livros estão tortos, outros empilhados sem ordem. Entre eles, revistas velhas, um álbum de fotos amassado e papéis soltos cobertos de pó. Entre todos esses livros, você um deles chama a atenção, um livro grande e vermelho com o nome: Qual é a Letra, parece interessante.",
+                options: [
+                    { text: "Pegar o Livro", nextScene: "sceneEnigmaZ" },
+                    { text: "Voltar", nextScene: "scenePA3" },
+                ]
+            },
+
+            sceneEnigmaZ: {
+                description: "Você pega o livro grande e vermelho, sentindo a capa áspera sob seus dedos. Ao abrir, vê que ele é uma lista simples de palavras que começam com a letra Z. Você lê em voz baixa: Zombaria. Zebra. Zíper. Zangado. Zulu. Zéfiro. Zodíaco. Cortar. Zumbido. Zangão. A página seguinte está em branco.",
+                options: [
+                    { text: "Voltar", nextScene: "scenePA3Op3" },
+                ]
+            },
+
+            scenePA3Op2: {
+                description: "Você encara a televisão velha apoiada no rack. A tela está coberta de poeira e cheia de marcas de dedos. A fiação fica visível atrás, mas tudo parece fora de uso há muito tempo.",
+                options: [
+                    { text: "Ligar a Televisão", nextScene: "deathPA3Op2" },
+                    { text: "Voltar", nextScene: "scenePA3" },
+                ]
+            },
+
+            deathPA3Op2: {
+                description: "Você aperta o botão da televisão. A tela pisca algumas vezes, até finalmente acender num chiado fraco. Um canal de culinária surge aleatório, mostrando uma faca cortando carne crua. Antes que consiga pensar em mudar de canal, você sente algo se mover atrás de você. Um golpe frio atravessa suas costas, depois outro e outro, rasgando sua pele sem dar chance de gritar. O sangue espirra na tela, borrando a imagem enquanto o som da faca na TV se mistura com o barulho real das facadas. O chiado do rádio volta a encher tudo. Você está morto.",
+                options: [
+                    { text: "REINICIAR", nextScene: "reload" }
+                ]
+            },
+
+        };
+
+        // Inicializar o jogo
+        function initGame() {
+            // Configurar event listeners
+            playOption.addEventListener('click', () => {
+                playClickSound();
+                showChoiceScene();
+            });
+            
+            restartButton.addEventListener('click', () => {
+                playClickSound();
+                location.reload();
+            });
+            
+            // Mostrar menu principal
+            showMainMenu();
+        }
+        
+        // Mostrar menu principal
+        function showMainMenu() {
+            mainMenu.classList.remove('hidden');
+            choiceScene.classList.add('hidden');
+            deathScreen.classList.add('hidden');
+            screenElement.classList.remove('death-effect');
+            screenElement.classList.remove('red-theme');
+            isDeathScene = false;
+        }
+        
+        // Mostrar cena de escolhas
+        function showChoiceScene(sceneId = 'scene1') {
+            mainMenu.classList.add('hidden');
+            choiceScene.classList.remove('hidden');
+            deathScreen.classList.add('hidden');
+            screenElement.classList.remove('death-effect');
+            
+            // Remover tema vermelho
+            screenElement.classList.remove('red-theme');
+            isDeathScene = false;
+            
+            playClickSound();
+            loadScene(sceneId);
+        }
+        
+        // Mostrar tela de morte
+        function showDeathScreen(message) {
+            mainMenu.classList.add('hidden');
+            choiceScene.classList.add('hidden');
+            deathScreen.classList.remove('hidden');
+            screenElement.classList.add('death-effect');
+            
+            // Aplicar tema vermelho
+            screenElement.classList.add('red-theme');
+            isDeathScene = true;
+            
+            deathMessage.textContent = message;
+            applyDeathEffect();
+        }
+        
+        // Função para obter as opções disponíveis (com base nas condições)
+        function getAvailableOptions(options) {
+            return options.filter(option => {
+                // Se não tem condição, sempre mostra
+                if (!option.condition) return true;
+                // Se tem condição, retorna o resultado
+                return option.condition();
+            });
+        }
+
+        // Carregar uma cena específica
+        function loadScene(sceneId) {
+            if (sceneId === 'reload') {
+                playDeathSound();
+                setTimeout(() => location.reload(), 1500);
+                return;
+            }
+            
+            const scene = scenes[sceneId];
+            if (!scene) return;
+            
+            gameState.currentScene = sceneId;
+            
+            situationElement.innerHTML = '';
+            optionsElement.innerHTML = '';
+            
+            // Verificar se é uma cena de morte
+            isDeathScene = scene.options.length === 1 && scene.options[0].text === 'REINICIAR';
+            
+            // Aplicar tema vermelho se for uma cena de morte
+            if (isDeathScene) {
+                screenElement.classList.add('red-theme');
+            } else {
+                screenElement.classList.remove('red-theme');
+            }
+            
+            // Mostrar texto com animação de digitação
+            typeText(scene.description, situationElement);
+            
+            // Desativar temporariamente os botões durante a digitação
+            disableOptions();
+            
+            // Filtrar as opções disponíveis com base nas condições
+            const availableOptions = getAvailableOptions(scene.options);
+            
+            // Criar opções (mas mantê-las desativadas até o fim da digitação)
+            createOptions(availableOptions);
+            
+            // Tocar efeito sonoro apropriado
+            if (isDeathScene) {
+                playDeathSound();
+            } else {
+                playStaticNoise(2);
+            }
+        }
+        
+        // Função para desativar os botões durante a digitação
+        function disableOptions() {
+            const options = document.querySelectorAll('.option');
+            options.forEach(option => {
+                option.classList.add('disabled');
+            });
+        }
+        
+        // Função para ativar os botões após a digitação
+        function enableOptions() {
+            const options = document.querySelectorAll('.option');
+            options.forEach(option => {
+                option.classList.remove('disabled');
+            });
+        }
+        
+        // Criar botões de opção
+        function createOptions(options) {
+            const optionsCount = options.length;
+            
+            if (optionsCount < 4) {
+                optionsElement.style.gridTemplateColumns = '1fr';
+                optionsElement.style.alignItems = 'center';
+                optionsElement.style.justifyContent = 'center';
+            } else {
+                optionsElement.style.gridTemplateColumns = '1fr 1fr';
+                optionsElement.style.alignItems = 'stretch';
+                optionsElement.style.justifyContent = 'stretch';
+            }
+            
+            options.forEach(option => {
+                const optionElement = document.createElement('div');
+                optionElement.className = 'option disabled'; // Inicialmente desativado
+                optionElement.textContent = option.text;
+                
+                optionElement.addEventListener('click', () => {
+                    // Se estiver digitando, não fazer nada
+                    if (isTyping) return;
+                    
+                    playClickSound();
+                    
+                    optionElement.classList.add('click-effect');
+                    setTimeout(() => {
+                        optionElement.classList.remove('click-effect');
+                    }, 200);
+                    
+                    // Se a opção tem uma ação, executá-la
+                    if (option.action) {
+                        option.action();
+                    }
+                    
+                    loadScene(option.nextScene);
+                });
+                
+                optionsElement.appendChild(optionElement);
+            });
+        }
+        
+        // Função para simular digitação
+        function typeText(text, element) {
+            isTyping = true;
+            typingIndicator.classList.remove('hidden');
+            
+            let i = 0;
+            element.innerHTML = '';
+            
+            const typeInterval = setInterval(() => {
+                if (i < text.length) {
+                    element.innerHTML = text.substring(0, i + 1) + '<span class="cursor"></span>';
+                    i++;
+                } else {
+                    clearInterval(typeInterval);
+                    element.innerHTML = text;
+                    isTyping = false;
+                    typingIndicator.classList.add('hidden');
+                    
+                    // Ativar os botões após o término da digitação
+                    enableOptions();
+                }
+            }, 1);
+        }
+        
+        // Aplicar efeito de morte
+        function applyDeathEffect() {
+            screenElement.classList.add('death-effect');
+            screenElement.style.animation = 'death-shake 0.5s linear';
+            setTimeout(() => {
+                screenElement.style.animation = 'flicker 0.2s infinite, distort 8s infinite, shake 15s infinite, wave 10s infinite';
+            }, 500);
+            playDeathSound();
+        }
+        
+        // Tocar som de clique
+        function playClickSound() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.value = 0.3;
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(400, audioCtx.currentTime);
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.05);
+            } catch (e) {
+                console.log("Erro de áudio:", e);
+            }
+        }
+        
+        // Tocar efeito sonoro de chiado de rádio
+        function playStaticNoise(duration = 2) {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const bufferSize = 2 * audioCtx.sampleRate;
+                const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+                
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+                
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = noiseBuffer;
+                noise.loop = true;
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 1000;
+                filter.Q.value = 1.0;
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.value = 0.05;
+                noise.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                noise.start();
+                
+                setTimeout(() => {
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+                    setTimeout(() => {
+                        noise.stop();
+                    }, 500);
+                }, duration * 1000);
+            } catch (e) {
+                console.log("Erro de áudio:", e);
+            }
+        }
+        
+        // Tocar som de morte
+        function playDeathSound() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.value = 0.5;
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(80, audioCtx.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(20, audioCtx.currentTime + 1);
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 1);
+            } catch (e) {
+                console.log("Erro de áudio:", e);
+            }
+        }
+        
+        // Efeito de cursor piscante
+        setInterval(() => {
+            const cursor = document.querySelector('.cursor');
+            if (cursor) {
+                cursor.style.visibility = (cursor.style.visibility === 'hidden') ? 'visible' : 'hidden';
+            }
+        }, 500);
+        
+        // Efeitos aleatórios de distorção
+        setInterval(() => {
+            screenElement.style.animation = 'none';
+            setTimeout(() => {
+                screenElement.style.animation = 'flicker 0.2s infinite, distort 8s infinite, shake 15s infinite, wave 10s infinite';
+            }, 10);
+        }, 30000);
+        
+        // Animação de tremor para morte
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes death-shake {
+                0%, 100% { transform: translate(0, 0); }
+                10%, 30%, 50%, 70%, 90% { transform: translate(-10px, -10px); }
+                20%, 40%, 60%, 80% { transform: translate(10px, 10px); }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // Iniciar o jogo
+        window.addEventListener('DOMContentLoaded', initGame);
+    </script>
+</body>
+</html>
